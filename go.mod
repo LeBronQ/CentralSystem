@@ -3,8 +3,13 @@ module NaiveSystem
 go 1.22.1
 
 require (
-	github.com/LeBronQ/Mobility v0.0.0-20240327080122-b9b150454efa // indirect
-	github.com/LeBronQ/RadioChannelModel v0.0.0-20240405072416-56d8240334dd // indirect
+	github.com/LeBronQ/Mobility v0.0.0-20240327080122-b9b150454efa
+	github.com/LeBronQ/RadioChannelModel v0.0.0-20240405072416-56d8240334dd
+	github.com/LeBronQ/kdtree v1.0.1
+	github.com/hashicorp/consul/api v1.28.3
+)
+
+require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac // indirect
@@ -14,7 +19,7 @@ require (
 	github.com/gonum/mathext v0.0.0-20181121095525-8a4bf007ea55 // indirect
 	github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9 // indirect
 	github.com/gonum/stat v0.0.0-20181125101827-41a0da705a5b // indirect
-	github.com/hashicorp/consul/api v1.28.3 // indirect
+	github.com/hashicorp/consul/proto-public v0.6.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.5.0 // indirect
@@ -23,6 +28,8 @@ require (
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/serf v0.10.1 // indirect
+	github.com/kyroy/kdtree v0.0.0-20200419114247-70830f883f1d // indirect
+	github.com/kyroy/priority-queue v0.0.0-20180327160706-6e21825e7e0c // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

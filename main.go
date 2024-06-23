@@ -9,14 +9,18 @@ import (
 	"bytes"
 	"net/http"
 	"encoding/json"
+	"github.com/LeBronQ/kdtree"
+	"github.com/LeBronQ/kdtree/points"
 	//"sync"
 	consulapi "github.com/hashicorp/consul/api"
 )
 
 const (
-	NodeNum = 10
+	NodeNum = 100
 	consul_address = "127.0.0.1:8500"
 )
+var channel_se = Discovery("Default_ChannelModel")
+var mobility_se = Discovery("Default_MobilityModel")
 
 type Node struct {
 	ID      int64
@@ -56,6 +60,10 @@ type ChannelReqParams struct {
 
 type MobilityReqParams struct {
 	Node    Mobility.Node    `json:"node"`
+}
+
+type TreeNodeData struct {
+	ID int64
 }
 
 func GenerateNodes() []*Node {
@@ -106,10 +114,10 @@ func Discovery(serviceName string) []*consulapi.ServiceEntry {
 	return service
 }
 
-func MobilityRequest(node Mobility.Node) []byte {
-	se := Discovery("Default_MobilityModel")
-	port := se[0].Service.Port
-	address := se[0].Service.Address
+func MobilityRequest(node Mobility.Node, se *consulapi.ServiceEntry) []byte {
+	//se := Discovery("Default_MobilityModel")
+	port := se.Service.Port
+	address := se.Service.Address
 	request := "http://" + address + ":" + strconv.Itoa(port) + "/mobility"
 	param := MobilityReqParams{
 		Node: node,
@@ -151,22 +159,25 @@ func MobilityRequest(node Mobility.Node) []byte {
 	return body
 }
 
-func UpdatePosition(NodeArr []*Node) {
+func UpdatePosition(NodeArr []*Node, TreeNodeArr []kdtree.Point) []kdtree.Point{
 	for _, node := range NodeArr {
-		res := MobilityRequest(node.MobNode)
+		res := MobilityRequest(node.MobNode, mobility_se[0])
 		var newNode MobilityReqParams
 		err := json.Unmarshal(res, &newNode)
 		if err != nil {
 			fmt.Println("Error:", err)
 		}
 		node.MobNode = newNode.Node
+		p := points.NewPoint([]float64{node.MobNode.Pos.X, node.MobNode.Pos.Y, node.MobNode.Pos.Z}, TreeNodeData{ID: node.ID})
+		TreeNodeArr = append(TreeNodeArr, p)
 	}
+	return TreeNodeArr
 }
 
-func ChannelRequest(Tx RadioChannelModel.WirelessNode, Rx RadioChannelModel.WirelessNode, TxPos RadioChannelModel.Position, RxPos RadioChannelModel.Position) {
-	se := Discovery("Default_ChannelModel")
-	port := se[0].Service.Port
-	address := se[0].Service.Address
+func ChannelRequest(Tx RadioChannelModel.WirelessNode, Rx RadioChannelModel.WirelessNode, TxPos RadioChannelModel.Position, RxPos RadioChannelModel.Position, se *consulapi.ServiceEntry) {
+	//se := Discovery("Default_ChannelModel")
+	port := se.Service.Port
+	address := se.Service.Address
 	request := "http://" + address + ":" + strconv.Itoa(port) + "/model"
 	mod := ChannelModel{
 		LargeScaleModel: "FreeSpacePathLossModel",
@@ -211,36 +222,45 @@ func ChannelRequest(Tx RadioChannelModel.WirelessNode, Rx RadioChannelModel.Wire
 		return
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	_, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Error reading response body:", err)
 		return
 	}
 
-	fmt.Println("Response:", string(body))
+	//fmt.Println("Response:", string(body))
 }
 
-func UpdateNeighborsAndCalculatePLR(graph [NodeNum][]*Node, NodeArr []*Node) {
+func UpdateNeighborsAndCalculatePLR(graph [NodeNum][]*Node, NodeArr []*Node, tree *kdtree.KDTree) {
 	for i := 0; i < NodeNum; i++ {
-		target := NodeArr[i]
-		distance := target.Range
 		var neighbors []*Node
-		for _, node := range NodeArr {
-			if node.ID != target.ID {
-				if Mobility.CalculateDistance3D(node.MobNode.Pos, target.MobNode.Pos) <= distance {
-					neighbors = append(neighbors, node)
-					ChannelRequest(target.WNode, node.WNode, RadioChannelModel.Position(target.MobNode.Pos), RadioChannelModel.Position(node.MobNode.Pos))
-				}
-			}
+		node := NodeArr[i]
+		distance := node.Range
+		center := points.NewPoint([]float64{node.MobNode.Pos.X, node.MobNode.Pos.Y, node.MobNode.Pos.Z}, TreeNodeData{ID: node.ID})
+		res := tree.QueryBallPoint(center, distance)
+		//fmt.Printf("%v\n",res[0].GetData().(TreeNodeData).ID)
+		for _, neigh := range res {
+			neigh_ID := neigh.GetData().(TreeNodeData).ID
+			if node.ID == neigh_ID {
+				continue
+			} else {
+				neigh_node := NodeArr[neigh_ID]
+				ChannelRequest(node.WNode, neigh_node.WNode, RadioChannelModel.Position(node.MobNode.Pos), RadioChannelModel.Position(neigh_node.MobNode.Pos),channel_se[0])
+				neighbors = append(neighbors, neigh_node)
+			} 
 		}
 		graph[i] = neighbors
+		//fmt.Printf("%v\n", graph[i])
 	}
 }
 
+
 func main() {
+	var nodes []kdtree.Point
 	NodeArr := make([]*Node, NodeNum)
 	NodeArr = GenerateNodes()
-	UpdatePosition(NodeArr)
+	nodes = UpdatePosition(NodeArr, nodes)
+	tree := kdtree.New(nodes)
 	var graph [NodeNum][]*Node
-	UpdateNeighborsAndCalculatePLR(graph, NodeArr)
+	UpdateNeighborsAndCalculatePLR(graph, NodeArr, tree)
 }
